@@ -1,0 +1,128 @@
+---
+title: "Tracking Absentee Ballot Status"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    df_print: paged
+knit: (function(i, encoding) {apstyle::render(i, encoding)})
+---
+<!-- Timestamp: leave this in to automatically track when a file is rendered -->
+*Rendered at `r format(Sys.time(), '%I:%M %p, %b. %d, %Y')`*
+
+<!-- Contact info: leave author/reporter/editor contact info here -->
+*Ryan Thornburg (<ryan.thornburg@unc.edu>)*
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE
+  )
+
+knitr::opts_knit$set(
+  root.dir = rprojroot::find_rstudio_root_file()
+  )
+```
+
+```{r initialize}
+# Load files, environment variables, libraries, etc. here
+library(tidyverse)
+library(lubridate)
+library(apstyle)
+library(DT)
+```
+
+
+## Loading Data
+```{r loading, message = FALSE}
+
+
+temp <- tempfile()
+download.file("https://s3.amazonaws.com/dl.ncsbe.gov/ENRS/2020_11_03/absentee_20201103.zip", temp)
+unzip(temp)
+
+absentee_20201103 <- read_csv("absentee_20201103.csv", 
+                              col_types = cols(voter_zip = col_character(), 
+                                               other_city_state_zip = col_skip(), 
+                                               relative_request_name = col_skip(), 
+                                               relative_request_address = col_skip(), 
+                                               relative_request_city = col_skip(), 
+                                               relative_request_state = col_skip(), 
+                                               relative_request_zip = col_skip(), 
+                                               election_dt = col_date(format = "%m/%d/%Y"), 
+                                               ballot_req_dt = col_date(format = "%m/%d/%Y"), 
+                                               ballot_send_dt = col_date(format = "%m/%d/%Y"),
+                                               ballot_rtn_dt = col_date(format = "%m/%d/%Y")))
+
+```
+
+## Create Status Tracker, by NCID
+```{r pivot}
+
+ncid_status_tracker<- absentee_20201103 %>%
+  pivot_wider(names_from = ballot_rtn_status, values_from = ballot_rtn_dt)
+
+ncid_status_tracker <- ncid_status_tracker %>%
+#must group by both ncid and voter_reg_num because a very few voters have two voter_reg_nums.)  
+  group_by(ncid, voter_reg_num) %>%
+  summarize(accepted = max(ACCEPTED, na.rm=TRUE),
+            pending_cure = max(`PENDING CURE`, na.rm = TRUE),
+            spoiled = max(SPOILED, na.rm = TRUE),
+            witness_inc = max(`WITNESS INFO INCOMPLETE`, na.rm = TRUE),
+            undeliverable = max(`RETURNED UNDELIVERABLE`, na.rm = TRUE),
+            pending = max(PENDING, na.rm = TRUE),
+            accepted_cured = max(`ACCEPTED - CURED`, na.rm = TRUE),
+            conflict = max(CONFLICT, na.rm = TRUE),
+            sig_diff = max(`SIGNATURE DIFFERENT`, na.rm = TRUE),
+            duplicate = max(DUPLICATE, na.rm = TRUE),
+            other = max(`NA`, na.rm = TRUE),
+            trans_fail = max(`E-TRANSMISSION FAILURE`, na.rm = TRUE)
+  ) %>% as_tibble
+
+tracker_filename <- paste0("ncid_status_tracker", format(Sys.time(), '%y%m%d'), ".csv")
+
+
+rio::export(ncid_status_tracker, tracker_filename)
+
+#datatable(ncid_status_tracker)
+```
+
+## Days Between Witness Error and Acceptance
+```{r duration}
+
+duration <- ncid_status_tracker %>%
+  filter(!is.infinite(witness_inc)) %>%
+  filter(!is.infinite(accepted) | !is.infinite(accepted_cured)) %>%
+  #I'm not sure of the difference between "accepted" and "accepted cured" but they are mutually exclusive.
+  mutate(accepted = case_when(is.infinite(accepted) ~ accepted_cured,
+                                !is.infinite(accepted) ~ accepted))
+
+
+duration_filename <- paste0("witness_accepted", format(Sys.time(), '%y%m%d'), ".csv")
+
+rio::export(duration, duration_filename)
+
+#datatable(duration)
+```
+As of `r format(Sys.time(), '%B %d')` there were `r absentee_20201103 %>% filter(ballot_rtn_status=="WITNESS INFO INCOMPLETE") %>% nrow()` vote-by-mail ballots that had county board of election said had incomplete witness information. But `r duration %>% nrow()` were later accepted. 
+
+## Average Time from Witness Incomplete to Acceptance
+```{r avg_duration}
+
+avg_duration<- duration %>% mutate(lag = accepted - witness_inc) %>% select(witness_inc, accepted, lag) %>% summarize(avg_lag= mean(lag))
+
+avg_duration<-round(avg_duration$avg_lag)
+```
+The average time between the time a county board finds a ballot with an incomplete witness is `r avg_duration` days.
+
+
+
+## References
+
+<!-- This section is for including references to related material -->
+
+- https://twitter.com/OldNorthStPol/status/1315346895779368968/photo/1
+
+- https://www.ncsbe.gov/results-data/absentee-data
