@@ -30,6 +30,7 @@ knitr::opts_knit$set(
 # Load files, environment variables, libraries, etc. here
 library(tidyverse)
 library(lubridate)
+library(janitor)
 library(apstyle)
 library(DT)
 ```
@@ -38,12 +39,15 @@ library(DT)
 ## Loading Data
 ```{r loading, message = FALSE}
 
-
 temp <- tempfile()
-download.file("https://s3.amazonaws.com/dl.ncsbe.gov/ENRS/2020_11_03/absentee_20201103.zip", temp)
-unzip(temp)
+filename_daily<- paste0("absentee_20201103","_", format(Sys.time(), '%y%m%d'),".csv")
+download.file("https://s3.amazonaws.com/dl.ncsbe.gov/ENRS/2020_11_03/absentee_20201103.zip", temp <- temp)
+unzip(temp, exdir = "data")
 
-absentee_20201103 <- read_csv("absentee_20201103.csv", 
+file.rename(file.path("data","absentee_20201103.csv"), file.path("data",filename_daily))
+
+
+absentee_20201103 <- read_csv(file.path("data",filename_daily), 
                               col_types = cols(voter_zip = col_character(), 
                                                other_city_state_zip = col_skip(), 
                                                relative_request_name = col_skip(), 
@@ -62,29 +66,18 @@ absentee_20201103 <- read_csv("absentee_20201103.csv",
 ```{r pivot}
 
 ncid_status_tracker<- absentee_20201103 %>%
-  pivot_wider(names_from = ballot_rtn_status, values_from = ballot_rtn_dt)
-
-ncid_status_tracker <- ncid_status_tracker %>%
-#must group by both ncid and voter_reg_num because a very few voters have two voter_reg_nums.)  
-  group_by(ncid, voter_reg_num) %>%
-  summarize(accepted = max(ACCEPTED, na.rm=TRUE),
-            pending_cure = max(`PENDING CURE`, na.rm = TRUE),
-            spoiled = max(SPOILED, na.rm = TRUE),
-            witness_inc = max(`WITNESS INFO INCOMPLETE`, na.rm = TRUE),
-            undeliverable = max(`RETURNED UNDELIVERABLE`, na.rm = TRUE),
-            pending = max(PENDING, na.rm = TRUE),
-            accepted_cured = max(`ACCEPTED - CURED`, na.rm = TRUE),
-            conflict = max(CONFLICT, na.rm = TRUE),
-            sig_diff = max(`SIGNATURE DIFFERENT`, na.rm = TRUE),
-            duplicate = max(DUPLICATE, na.rm = TRUE),
-            other = max(`NA`, na.rm = TRUE),
-            trans_fail = max(`E-TRANSMISSION FAILURE`, na.rm = TRUE)
-  ) %>% as_tibble
+  #On Oct. 15 20 unique voters had multiple rows for the same ballot_rtn_status + ballot_rtn_date. At least one had multiple dates for the same ballot return status.
+  group_by(ncid, voter_reg_num, ballot_rtn_status, ballot_rtn_dt) %>%
+  #Use values_fn = max here to take the most recent date if a voter has two dates for the same status.
+  pivot_wider(names_from = ballot_rtn_status, values_from = ballot_rtn_dt, values_fn = max) %>%
+  clean_names() %>%
+  #This line only works if there are exactly 13 valid values in the original ballot_rtn_status field
+  select(ncid, voter_reg_num,accepted, accepted_cured, pending_cure, spoiled, returned_undeliverable, witness_info_incomplete, pending, cancelled, conflict, duplicate, signature_different, other=na, e_transmission_failure) 
 
 tracker_filename <- paste0("ncid_status_tracker", format(Sys.time(), '%y%m%d'), ".csv")
 
 
-rio::export(ncid_status_tracker, tracker_filename)
+rio::export(ncid_status_tracker, file.path("data",tracker_filename))
 
 #datatable(ncid_status_tracker)
 ```
@@ -93,16 +86,16 @@ rio::export(ncid_status_tracker, tracker_filename)
 ```{r duration}
 
 duration <- ncid_status_tracker %>%
-  filter(!is.infinite(witness_inc)) %>%
+  filter(!is.infinite(witness_info_incomplete)) %>%
   filter(!is.infinite(accepted) | !is.infinite(accepted_cured)) %>%
-  #I'm not sure of the difference between "accepted" and "accepted cured" but they are mutually exclusive.
+  #I'm not sure about the different meanings of "accepted" vs. "accepted cured" but they are mutually exclusive.
   mutate(accepted = case_when(is.infinite(accepted) ~ accepted_cured,
                                 !is.infinite(accepted) ~ accepted))
 
 
 duration_filename <- paste0("witness_accepted", format(Sys.time(), '%y%m%d'), ".csv")
 
-rio::export(duration, duration_filename)
+rio::export(duration, file.path("data",duration_filename))
 
 #datatable(duration)
 ```
@@ -111,7 +104,7 @@ As of `r format(Sys.time(), '%B %d')` there were `r absentee_20201103 %>% filter
 ## Average Time from Witness Incomplete to Acceptance
 ```{r avg_duration}
 
-avg_duration<- duration %>% mutate(lag = accepted - witness_inc) %>% select(witness_inc, accepted, lag) %>% summarize(avg_lag= mean(lag))
+avg_duration<- duration %>% as_tibble() %>% mutate(lag = accepted - witness_info_incomplete) %>% select(witness_info_incomplete, accepted, lag) %>% summarize(avg_lag= mean(lag))
 
 avg_duration<-round(avg_duration$avg_lag)
 ```
