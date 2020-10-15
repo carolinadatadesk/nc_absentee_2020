@@ -1,5 +1,24 @@
 # Tracking Vote-by-Mail Ballot Status
 
+*Oct. 15 Update*
+
+[Likely due to orders](https://www.ncsbe.gov/news/press-releases/2020/10/15/statement-executive-director-karen-brinson-bell) issued late last night by U.S. District Court William Osteen in the Democracy NC, Wise and Moore case, almost all of the "spoiled" or  "witness info incomplete" ballots that had been "accepted" no longer have an "accepted" status. 
+
+
+**Witness Info Incomplete Ballots**
+Status | Oct. 13 | Oct. 15
+------------ |------------ | -------------
+Witness info incompelte | 512 | 524
+Later accepted | 168 | 0
+
+
+**"Spoiled" Ballots**
+Status | Oct. 13 | Oct. 15
+------------ |------------ | -------------
+"Spoiled" | 3,998 | 1,202
+Later accepted | 4,543 | 4
+
+
 *Oct. 13, 2020*
 
 Inspired by random tweets and news reports describing ballots as being "rejected" in North Carolina, this is [R code inside a markdown document](https://github.com/carolinadatadesk/nc_absentee_2020/blob/main/nc_abst_ballot_status_2020.Rmd) that generates csv files in an attempt to better show how vote-by-mail ballots move through the system. With these csv files, you can see more easily that "spoiled" ballots doesn't mean what it means in common usage. 
