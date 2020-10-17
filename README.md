@@ -1,5 +1,8 @@
 # Tracking Vote-by-Mail Ballot Status
 
+*Oct. 16 Update*
+Added [a csv of precincts at most of the state's largest universities](https://github.com/carolinadatadesk/nc_absentee_2020/blob/main/data/precincts_colleges_nc.csv). List is from [Gerry Cohen](@gercohen). The universities on this list account for about 80% of college students in North Carolina.
+
 *Oct. 15 Update*
 
 [Likely due to orders](https://www.ncsbe.gov/news/press-releases/2020/10/15/statement-executive-director-karen-brinson-bell) issued late last night by U.S. District Court William Osteen in the Democracy NC, Wise and Moore case, almost all of the "spoiled" or  "witness info incomplete" ballots that had been "accepted" no longer have an "accepted" status. 
