@@ -1,6 +1,7 @@
 # Tracking Vote-by-Mail Ballot Status
 
 *Oct. 16 Update*
+
 Added [a csv of precincts at most of the state's largest universities](https://github.com/carolinadatadesk/nc_absentee_2020/blob/main/data/precincts_colleges_nc.csv). List is from [Gerry Cohen](@gercohen). The universities on this list account for about 80% of college students in North Carolina.
 
 *Oct. 15 Update*
